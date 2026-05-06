@@ -1,0 +1,37 @@
+{
+  "best_model": "Random Forest",
+  "accuracy": 1.0,
+  "f1_weighted": 1.0,
+  "f1_macro": 1.0,
+  "cv_f1_mean": 1.0,
+  "cv_f1_std": 0.0,
+  "features": [
+    "bpm",
+    "hrv_sdnn",
+    "hrv_rmssd",
+    "dynamic_accel",
+    "impact",
+    "pitch",
+    "roll",
+    "gx",
+    "gy",
+    "gz",
+    "movement_var",
+    "bpm_mean_10s",
+    "bpm_std_10s",
+    "dynamic_accel_mean_5s",
+    "dynamic_accel_max_5s",
+    "impact_max_5s",
+    "pitch_mean_5s",
+    "movement_var_mean_5s",
+    "gyro_magnitude_mean_5s"
+  ],
+  "labels": [
+    "high_exertion",
+    "man_down",
+    "normal"
+  ],
+  "trained_at": "2026-04-30T11:31:09.530856",
+  "n_features": 19,
+  "n_classes": 3
+}

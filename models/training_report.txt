@@ -1,0 +1,115 @@
+======================================================================
+  AI-BASED SOLDIER SURVIVAL DETECTION — TRAINING REPORT
+  Generated: 2026-04-30 11:31:12
+======================================================================
+
+Best Model: Random Forest
+Test Accuracy: 1.0000
+F1 Weighted: 1.0000
+F1 Macro: 1.0000
+CV F1: 1.0000 ± 0.0000
+
+
+==================================================
+MODEL: Random Forest
+==================================================
+Accuracy: 1.0000
+F1 Weighted: 1.0000
+F1 Macro: 1.0000
+CV F1: 1.0000 ± 0.0000
+Train Time: 0.55s
+
+Classification Report:
+               precision    recall  f1-score   support
+
+high_exertion       1.00      1.00      1.00      1160
+     man_down       1.00      1.00      1.00      1160
+       normal       1.00      1.00      1.00      1160
+
+     accuracy                           1.00      3480
+    macro avg       1.00      1.00      1.00      3480
+ weighted avg       1.00      1.00      1.00      3480
+
+
+Confusion Matrix:
+[[1160    0    0]
+ [   0 1160    0]
+ [   0    0 1160]]
+
+==================================================
+MODEL: XGBoost
+==================================================
+Accuracy: 1.0000
+F1 Weighted: 1.0000
+F1 Macro: 1.0000
+CV F1: 1.0000 ± 0.0000
+Train Time: 0.29s
+
+Classification Report:
+               precision    recall  f1-score   support
+
+high_exertion       1.00      1.00      1.00      1160
+     man_down       1.00      1.00      1.00      1160
+       normal       1.00      1.00      1.00      1160
+
+     accuracy                           1.00      3480
+    macro avg       1.00      1.00      1.00      3480
+ weighted avg       1.00      1.00      1.00      3480
+
+
+Confusion Matrix:
+[[1160    0    0]
+ [   0 1160    0]
+ [   0    0 1160]]
+
+==================================================
+MODEL: SVM
+==================================================
+Accuracy: 1.0000
+F1 Weighted: 1.0000
+F1 Macro: 1.0000
+CV F1: 1.0000 ± 0.0000
+Train Time: 0.39s
+
+Classification Report:
+               precision    recall  f1-score   support
+
+high_exertion       1.00      1.00      1.00      1160
+     man_down       1.00      1.00      1.00      1160
+       normal       1.00      1.00      1.00      1160
+
+     accuracy                           1.00      3480
+    macro avg       1.00      1.00      1.00      3480
+ weighted avg       1.00      1.00      1.00      3480
+
+
+Confusion Matrix:
+[[1160    0    0]
+ [   0 1160    0]
+ [   0    0 1160]]
+
+==================================================
+MODEL: Neural Network
+==================================================
+Accuracy: 1.0000
+F1 Weighted: 1.0000
+F1 Macro: 1.0000
+CV F1: 1.0000 ± 0.0000
+Train Time: 1.83s
+
+Classification Report:
+               precision    recall  f1-score   support
+
+high_exertion       1.00      1.00      1.00      1160
+     man_down       1.00      1.00      1.00      1160
+       normal       1.00      1.00      1.00      1160
+
+     accuracy                           1.00      3480
+    macro avg       1.00      1.00      1.00      3480
+ weighted avg       1.00      1.00      1.00      3480
+
+
+Confusion Matrix:
+[[1160    0    0]
+ [   0 1160    0]
+ [   0    0 1160]]

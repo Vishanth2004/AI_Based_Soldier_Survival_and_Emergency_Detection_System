@@ -1,0 +1,1142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Soldier Survival Detection — Live Dashboard</title>
+
+    <!-- Bootstrap 5 -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Bootstrap Icons -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <!-- Socket.IO -->
+    <script src="https://cdn.jsdelivr.net/npm/socket.io-client@4.7.4/dist/socket.io.min.js"></script>
+    <!-- Leaflet (GPS Map) -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+    <style>
+        :root {
+            --bg-primary: #0a0e1a;
+            --bg-card: #111827;
+            --bg-card-hover: #1a2332;
+            --border: #1e293b;
+            --text-primary: #e2e8f0;
+            --text-secondary: #94a3b8;
+            --text-muted: #64748b;
+            --accent-blue: #3b82f6;
+            --accent-green: #22c55e;
+            --accent-yellow: #eab308;
+            --accent-red: #ef4444;
+            --accent-purple: #a855f7;
+            --accent-orange: #f97316;
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            margin: 0;
+            padding: 0;
+            overflow-x: hidden;
+        }
+
+        /* Top Navbar */
+        .top-bar {
+            background: linear-gradient(135deg, #111827 0%, #1a1a2e 100%);
+            border-bottom: 1px solid var(--border);
+            padding: 12px 24px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+        }
+
+        .top-bar .logo {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .top-bar .logo i {
+            font-size: 28px;
+            color: var(--accent-blue);
+        }
+
+        .top-bar .logo h1 {
+            font-size: 18px;
+            font-weight: 600;
+            margin: 0;
+        }
+
+        .top-bar .logo span {
+            font-size: 12px;
+            color: var(--text-muted);
+        }
+
+        .connection-status {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 13px;
+        }
+
+        .connection-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: var(--accent-red);
+            animation: pulse-dot 2s infinite;
+        }
+
+        .connection-dot.connected {
+            background: var(--accent-green);
+        }
+
+        @keyframes pulse-dot {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.4; }
+        }
+
+        /* Main Content */
+        .main-content {
+            padding: 16px 24px;
+            max-width: 1600px;
+            margin: 0 auto;
+        }
+
+        /* Status Hero Card */
+        .status-hero {
+            background: var(--bg-card);
+            border: 2px solid var(--border);
+            border-radius: 16px;
+            padding: 24px 32px;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            transition: all 0.15s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .status-hero::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: var(--border);
+            transition: background 0.15s ease;
+        }
+
+        .status-hero.normal::before { background: var(--accent-green); }
+        .status-hero.high_exertion::before { background: var(--accent-yellow); }
+        .status-hero.man_down::before { background: var(--accent-red); }
+
+        .status-hero.man_down {
+            border-color: var(--accent-red);
+            animation: alert-pulse 1s infinite;
+        }
+
+        @keyframes alert-pulse {
+            0%, 100% { box-shadow: 0 0 0 0 transparent; }
+            50% { box-shadow: 0 0 30px rgba(239, 68, 68, 0.3); }
+        }
+
+        .status-info {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .status-icon {
+            width: 64px;
+            height: 64px;
+            border-radius: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 32px;
+            transition: all 0.15s ease;
+        }
+
+        .status-icon.normal { background: rgba(34, 197, 94, 0.15); color: var(--accent-green); }
+        .status-icon.high_exertion { background: rgba(234, 179, 8, 0.15); color: var(--accent-yellow); }
+
+        .status-icon.man_down { background: rgba(239, 68, 68, 0.15); color: var(--accent-red); }
+        .status-icon.waiting { background: rgba(100, 116, 139, 0.15); color: var(--text-muted); }
+
+        .status-label {
+            font-size: 28px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .status-sublabel {
+            font-size: 13px;
+            color: var(--text-secondary);
+        }
+
+        .confidence-bars {
+            display: flex;
+            gap: 12px;
+            align-items: flex-end;
+        }
+
+        .conf-bar-group {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .conf-bar-outer {
+            width: 36px;
+            height: 80px;
+            background: rgba(255,255,255,0.05);
+            border-radius: 6px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .conf-bar-inner {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            border-radius: 6px;
+            transition: height 0.15s ease, background 0.15s ease;
+        }
+
+        .conf-bar-label {
+            font-size: 10px;
+            color: var(--text-muted);
+            text-align: center;
+            max-width: 50px;
+            line-height: 1.2;
+        }
+
+        .conf-bar-value {
+            font-size: 11px;
+            font-weight: 600;
+        }
+
+        /* Grid Cards */
+        .card-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+
+        .metric-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 16px;
+            transition: all 0.15s ease;
+        }
+
+        .metric-card:hover {
+            background: var(--bg-card-hover);
+            border-color: rgba(59, 130, 246, 0.3);
+        }
+
+        .metric-card .label {
+            font-size: 12px;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 6px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .metric-card .value {
+            font-size: 28px;
+            font-weight: 700;
+            line-height: 1;
+        }
+
+        .metric-card .unit {
+            font-size: 14px;
+            color: var(--text-secondary);
+            font-weight: 400;
+            margin-left: 4px;
+        }
+
+        .metric-card .sub {
+            font-size: 11px;
+            color: var(--text-muted);
+            margin-top: 4px;
+        }
+
+        /* Charts Section */
+        .charts-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+
+        .chart-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 16px;
+        }
+
+        .chart-card h3 {
+            font-size: 14px;
+            color: var(--text-secondary);
+            margin: 0 0 12px 0;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .chart-container {
+            position: relative;
+            height: 180px;
+        }
+
+        /* Bottom Row */
+        .bottom-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+
+        /* GPS Map */
+        .map-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 16px;
+        }
+
+        .map-card h3 {
+            font-size: 14px;
+            color: var(--text-secondary);
+            margin: 0 0 12px 0;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        #gps-map {
+            height: 250px;
+            border-radius: 8px;
+            background: #1a2332;
+        }
+
+        .gps-info {
+            display: flex;
+            gap: 16px;
+            margin-top: 8px;
+            font-size: 12px;
+            color: var(--text-muted);
+        }
+
+        /* Event Log */
+        .events-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 16px;
+        }
+
+        .events-card h3 {
+            font-size: 14px;
+            color: var(--text-secondary);
+            margin: 0 0 12px 0;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .event-list {
+            max-height: 280px;
+            overflow-y: auto;
+        }
+
+        .event-item {
+            padding: 8px 0;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+            display: flex;
+            gap: 10px;
+            font-size: 13px;
+        }
+
+        .event-time {
+            color: var(--text-muted);
+            font-family: monospace;
+            white-space: nowrap;
+        }
+
+        .event-title {
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .event-desc {
+            color: var(--text-secondary);
+        }
+
+        /* Alert Overlay */
+        .alert-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.85);
+            z-index: 9999;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .alert-overlay.active {
+            display: flex;
+            animation: alert-bg-flash 1s infinite;
+        }
+
+        @keyframes alert-bg-flash {
+            0%, 100% { background: rgba(0, 0, 0, 0.85); }
+            50% { background: rgba(139, 0, 0, 0.85); }
+        }
+
+        .alert-icon {
+            font-size: 80px;
+            color: var(--accent-red);
+            animation: alert-shake 0.5s infinite;
+        }
+
+        @keyframes alert-shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-5px); }
+            75% { transform: translateX(5px); }
+        }
+
+        .alert-text {
+            font-size: 42px;
+            font-weight: 800;
+            color: white;
+            text-transform: uppercase;
+            letter-spacing: 4px;
+        }
+
+        .alert-sub {
+            font-size: 18px;
+            color: #fca5a5;
+        }
+
+        .alert-dismiss {
+            padding: 12px 32px;
+            background: var(--accent-red);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            margin-top: 20px;
+        }
+
+        /* Model Info Bar */
+        .model-info-bar {
+            background: rgba(59, 130, 246, 0.08);
+            border: 1px solid rgba(59, 130, 246, 0.2);
+            border-radius: 8px;
+            padding: 8px 16px;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+
+        .model-info-bar span {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+
+        /* Responsive */
+        @media (max-width: 1200px) {
+            .card-grid { grid-template-columns: repeat(2, 1fr); }
+            .charts-grid { grid-template-columns: 1fr; }
+            .bottom-grid { grid-template-columns: 1fr; }
+        }
+
+        @media (max-width: 768px) {
+            .card-grid { grid-template-columns: 1fr; }
+            .status-hero { flex-direction: column; gap: 16px; text-align: center; }
+            .confidence-bars { justify-content: center; }
+            .main-content { padding: 12px; }
+        }
+
+        /* Body orientation indicator */
+        .body-indicator {
+            width: 60px;
+            height: 100px;
+            margin: 0 auto;
+            position: relative;
+        }
+
+        .body-stick {
+            width: 4px;
+            height: 60px;
+            background: var(--accent-blue);
+            border-radius: 2px;
+            position: absolute;
+            bottom: 10px;
+            left: 28px;
+            transform-origin: bottom center;
+            transition: transform 0.15s ease;
+        }
+
+        .body-head {
+            width: 16px;
+            height: 16px;
+            background: var(--accent-blue);
+            border-radius: 50%;
+            position: absolute;
+            bottom: 66px;
+            left: 22px;
+            transition: all 0.15s ease;
+        }
+    </style>
+</head>
+<body>
+
+<!-- Alert Overlay -->
+<div class="alert-overlay" id="alertOverlay">
+    <div class="alert-icon"><i class="bi bi-exclamation-triangle-fill"></i></div>
+    <div class="alert-text" id="alertText">MAN DOWN</div>
+    <div class="alert-sub" id="alertSub">Critical condition detected — Confidence: 95%</div>
+    <button class="alert-dismiss" onclick="dismissAlert()">
+        <i class="bi bi-check-lg"></i> Acknowledge & Dismiss
+    </button>
+</div>
+
+<!-- Top Bar -->
+<div class="top-bar">
+    <div class="logo">
+        <i class="bi bi-shield-fill-check"></i>
+        <div>
+            <h1>Soldier Survival Detection System</h1>
+            <span>AI-Powered Real-Time Monitoring</span>
+        </div>
+    </div>
+    <div class="connection-status">
+        <div class="connection-dot" id="connDot"></div>
+        <span id="connText">Connecting...</span>
+        <span style="margin-left:12px; color: var(--text-muted);">
+            <i class="bi bi-clock"></i> <span id="uptimeDisplay">0s</span>
+        </span>
+        <span style="margin-left:12px; color: var(--text-muted);">
+            <i class="bi bi-database"></i> <span id="sampleCount">0</span> samples
+        </span>
+    </div>
+</div>
+
+<!-- Main Content -->
+<div class="main-content">
+
+    <!-- Model Info Bar -->
+    <div class="model-info-bar">
+        <span><i class="bi bi-cpu"></i> Model: <strong id="modelName">Loading...</strong></span>
+        <span><i class="bi bi-bullseye"></i> Accuracy: <strong id="modelAccuracy">—</strong></span>
+        <span><i class="bi bi-layers"></i> Features: <strong id="modelFeatures">—</strong></span>
+        <span><i class="bi bi-tags"></i> Classes: normal, high_exertion, man_down</span>
+    </div>
+
+    <!-- Status Hero -->
+    <div class="status-hero waiting" id="statusHero">
+        <div class="status-info">
+            <div class="status-icon waiting" id="statusIcon">
+                <i class="bi bi-hourglass-split"></i>
+            </div>
+            <div>
+                <div class="status-label" id="statusLabel">WAITING FOR DATA</div>
+                <div class="status-sublabel" id="statusSub">Connect ESP32 to begin monitoring</div>
+            </div>
+        </div>
+        <div class="confidence-bars" id="confBars">
+            <div class="conf-bar-group">
+                <div class="conf-bar-value" id="confNormalVal">0%</div>
+                <div class="conf-bar-outer">
+                    <div class="conf-bar-inner" id="confNormal" style="height:0%;background:var(--accent-green);"></div>
+                </div>
+                <div class="conf-bar-label">Normal</div>
+            </div>
+            <div class="conf-bar-group">
+                <div class="conf-bar-value" id="confExertionVal">0%</div>
+                <div class="conf-bar-outer">
+                    <div class="conf-bar-inner" id="confExertion" style="height:0%;background:var(--accent-yellow);"></div>
+                </div>
+                <div class="conf-bar-label">Exertion</div>
+            </div>
+            <div class="conf-bar-group">
+                <div class="conf-bar-value" id="confManDownVal">0%</div>
+                <div class="conf-bar-outer">
+                    <div class="conf-bar-inner" id="confManDown" style="height:0%;background:var(--accent-red);"></div>
+                </div>
+                <div class="conf-bar-label">Man Down</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Vital Metrics -->
+    <div class="card-grid">
+        <div class="metric-card">
+            <div class="label"><i class="bi bi-heart-pulse-fill" style="color:var(--accent-red);"></i> Heart Rate</div>
+            <div class="value" id="bpmValue" style="color:var(--accent-red);">--<span class="unit">BPM</span></div>
+            <div class="sub">HRV(SDNN): <span id="hrvSdnn">--</span>ms | HRV(RMSSD): <span id="hrvRmssd">--</span>ms</div>
+        </div>
+        <div class="metric-card">
+            <div class="label"><i class="bi bi-activity" style="color:var(--accent-blue);"></i> Body Motion</div>
+            <div class="value" id="accelValue" style="color:var(--accent-blue);">--<span class="unit">g</span></div>
+            <div class="sub">Impact: <span id="impactValue">--</span> | Var: <span id="moveVarValue">--</span></div>
+        </div>
+        <div class="metric-card">
+            <div class="label"><i class="bi bi-person-standing" style="color:var(--accent-purple);"></i> Body Orientation</div>
+            <div class="value" id="pitchValue" style="color:var(--accent-purple);">--<span class="unit">°</span></div>
+            <div class="sub">Roll: <span id="rollValue">--</span>° | <span id="postureText">Unknown</span></div>
+        </div>
+        <div class="metric-card">
+            <div class="label"><i class="bi bi-geo-alt-fill" style="color:var(--accent-green);"></i> GPS</div>
+            <div class="value" id="gpsSpeedValue" style="color:var(--accent-green);">--<span class="unit">km/h</span></div>
+            <div class="sub">Alt: <span id="gpsAltValue">--</span>m | Sat: <span id="gpsSatValue">--</span> | <span id="gpsFixText">No Fix</span></div>
+        </div>
+    </div>
+
+    <!-- Charts -->
+    <div class="charts-grid">
+        <div class="chart-card">
+            <h3><i class="bi bi-heart-pulse" style="color:var(--accent-red);"></i> Heart Rate (60s)</h3>
+            <div class="chart-container">
+                <canvas id="bpmChart"></canvas>
+            </div>
+        </div>
+        <div class="chart-card">
+            <h3><i class="bi bi-activity" style="color:var(--accent-blue);"></i> Motion & Impact (60s)</h3>
+            <div class="chart-container">
+                <canvas id="motionChart"></canvas>
+            </div>
+        </div>
+        <div class="chart-card">
+            <h3><i class="bi bi-graph-up" style="color:var(--accent-purple);"></i> HRV (SDNN) (60s)</h3>
+            <div class="chart-container">
+                <canvas id="hrvChart"></canvas>
+            </div>
+        </div>
+        <div class="chart-card">
+            <h3><i class="bi bi-arrows-move" style="color:var(--accent-yellow);"></i> Body Pitch (60s)</h3>
+            <div class="chart-container">
+                <canvas id="pitchChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bottom Row: Map + Events -->
+    <div class="bottom-grid">
+        <div class="map-card">
+            <h3><i class="bi bi-map" style="color:var(--accent-green);"></i> GPS Location</h3>
+            <div id="gps-map"></div>
+            <div class="gps-info">
+                <span>Lat: <strong id="gpsLatDisplay">--</strong></span>
+                <span>Lon: <strong id="gpsLonDisplay">--</strong></span>
+                <span>Speed: <strong id="gpsSpeedDisplay">--</strong> km/h</span>
+            </div>
+        </div>
+        <div class="events-card">
+            <h3><i class="bi bi-journal-text" style="color:var(--accent-yellow);"></i> Event Log</h3>
+            <div class="event-list" id="eventList">
+                <div class="event-item">
+                    <span class="event-time">--:--:--</span>
+                    <div>
+                        <div class="event-title">System Ready</div>
+                        <div class="event-desc">Waiting for ESP32 sensor data...</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<!-- Alert Sound (generated via Web Audio API) -->
+<script>
+// ==================== AUDIO ====================
+let audioCtx = null;
+
+function playAlertSound(type) {
+    try {
+        if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+
+        if (type === 'man_down') {
+            osc.frequency.value = 800;
+            osc.type = 'sawtooth';
+            gain.gain.value = 0.3;
+            osc.start();
+            osc.frequency.setValueAtTime(800, audioCtx.currentTime);
+            osc.frequency.linearRampToValueAtTime(1200, audioCtx.currentTime + 0.5);
+            osc.frequency.linearRampToValueAtTime(800, audioCtx.currentTime + 1.0);
+            osc.stop(audioCtx.currentTime + 1.0);
+        } else {
+            osc.frequency.value = 600;
+            osc.type = 'square';
+            gain.gain.value = 0.15;
+            osc.start();
+            osc.stop(audioCtx.currentTime + 0.3);
+        }
+    } catch(e) { console.log('Audio error:', e); }
+}
+
+// ==================== CACHED DOM REFS ====================
+// Cache all frequently-accessed elements once at startup to avoid
+// repeated getElementById calls on every 1000 ms update.
+const DOM = {};
+function cacheDom() {
+    const ids = [
+        'statusHero','statusIcon','statusLabel','statusSub',
+        'confNormal','confNormalVal','confExertion','confExertionVal',
+        'confManDown','confManDownVal',
+        'bpmValue','hrvSdnn','hrvRmssd',
+        'accelValue','impactValue','moveVarValue',
+        'pitchValue','rollValue','postureText',
+        'gpsSpeedValue','gpsAltValue','gpsSatValue','gpsFixText',
+        'gpsLatDisplay','gpsLonDisplay','gpsSpeedDisplay',
+        'sampleCount','uptimeDisplay',
+        'connDot','connText',
+        'alertOverlay','alertText','alertSub',
+        'eventList',
+        'modelName','modelAccuracy','modelFeatures',
+    ];
+    ids.forEach(id => { DOM[id] = document.getElementById(id); });
+}
+
+// ==================== CHARTS ====================
+const chartDefaults = {
+    responsive: true,
+    maintainAspectRatio: false,
+    animation: false,          // <-- no animation at all = big perf win
+    plugins: { legend: { display: false } },
+    scales: {
+        x: { display: false },
+        y: {
+            grid: { color: 'rgba(255,255,255,0.05)' },
+            ticks: { color: '#64748b', font: { size: 10 } },
+        }
+    },
+    elements: {
+        point: { radius: 0 },
+        line: { borderWidth: 2 },
+    }
+};
+
+const MAX_POINTS = 240;
+
+function makeLabels() {
+    return Array.from({length: MAX_POINTS}, () => '');
+}
+
+// BPM Chart
+const bpmChart = new Chart(document.getElementById('bpmChart'), {
+    type: 'line',
+    data: {
+        labels: makeLabels(),
+        datasets: [{
+            data: [],
+            borderColor: '#ef4444',
+            backgroundColor: 'rgba(239, 68, 68, 0.1)',
+            fill: true,
+            tension: 0.3,
+        }]
+    },
+    options: {
+        ...chartDefaults,
+        scales: {
+            ...chartDefaults.scales,
+            y: { ...chartDefaults.scales.y, min: 40, max: 200,
+                 title: { display: true, text: 'BPM', color: '#64748b', font: { size: 10 } } }
+        }
+    }
+});
+
+// Motion Chart
+const motionChart = new Chart(document.getElementById('motionChart'), {
+    type: 'line',
+    data: {
+        labels: makeLabels(),
+        datasets: [
+            {
+                label: 'Accel',
+                data: [],
+                borderColor: '#3b82f6',
+                backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                fill: true,
+                tension: 0.3,
+            },
+            {
+                label: 'Impact',
+                data: [],
+                borderColor: '#f97316',
+                tension: 0.3,
+            }
+        ]
+    },
+    options: {
+        ...chartDefaults,
+        plugins: {
+            legend: {
+                display: true,
+                labels: { color: '#94a3b8', boxWidth: 12, font: { size: 10 } }
+            }
+        }
+    }
+});
+
+// HRV Chart
+const hrvChart = new Chart(document.getElementById('hrvChart'), {
+    type: 'line',
+    data: {
+        labels: makeLabels(),
+        datasets: [{
+            data: [],
+            borderColor: '#a855f7',
+            backgroundColor: 'rgba(168, 85, 247, 0.1)',
+            fill: true,
+            tension: 0.3,
+        }]
+    },
+    options: chartDefaults
+});
+
+// Pitch Chart
+const pitchChart = new Chart(document.getElementById('pitchChart'), {
+    type: 'line',
+    data: {
+        labels: makeLabels(),
+        datasets: [{
+            data: [],
+            borderColor: '#eab308',
+            backgroundColor: 'rgba(234, 179, 8, 0.08)',
+            fill: true,
+            tension: 0.3,
+        }]
+    },
+    options: {
+        ...chartDefaults,
+        scales: {
+            ...chartDefaults.scales,
+            y: { ...chartDefaults.scales.y, min: -90, max: 90,
+                 title: { display: true, text: 'Degrees', color: '#64748b', font: { size: 10 } } }
+        }
+    }
+});
+
+// Append data without triggering redraw — we batch-update in rAF
+function appendChartPoint(chart, value, datasetIdx) {
+    const ds = chart.data.datasets[datasetIdx || 0].data;
+    ds.push(value);
+    if (ds.length > MAX_POINTS) ds.shift();
+}
+
+// ==================== GPS MAP ====================
+let map = null;
+let marker = null;
+let pathLine = null;
+let gpsTrail = [];
+
+function initMap() {
+    map = L.map('gps-map', {
+        center: [20.5937, 78.9629],
+        zoom: 5,
+        zoomControl: true,
+        attributionControl: false,
+    });
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19,
+    }).addTo(map);
+
+    const soldierIcon = L.divIcon({
+        html: '<div style="background:#3b82f6;width:16px;height:16px;border-radius:50%;border:3px solid white;box-shadow:0 0 10px rgba(59,130,246,0.5);"></div>',
+        iconSize: [16, 16],
+        className: ''
+    });
+
+    marker = L.marker([20.5937, 78.9629], {icon: soldierIcon}).addTo(map);
+    marker.bindPopup("Soldier Position");
+    pathLine = L.polyline([], {color: '#3b82f6', weight: 2, opacity: 0.6}).addTo(map);
+}
+
+function updateMap(lat, lon) {
+    if (!map || !lat || !lon || (lat === 0 && lon === 0)) return;
+    const pos = [lat, lon];
+    marker.setLatLng(pos);
+    gpsTrail.push(pos);
+    if (gpsTrail.length > 500) gpsTrail.shift();
+    pathLine.setLatLngs(gpsTrail);
+    map.setView(pos, Math.max(map.getZoom(), 15));
+}
+
+// ==================== STATUS HELPERS ====================
+const STATUS_CONFIG = {
+    normal: { icon: 'bi-shield-fill-check', label: 'NORMAL', sub: 'Soldier is in normal condition', color: 'var(--accent-green)' },
+    high_exertion: { icon: 'bi-lightning-charge-fill', label: 'HIGH EXERTION', sub: 'Elevated physical activity detected', color: 'var(--accent-yellow)' },
+    man_down: { icon: 'bi-exclamation-triangle-fill', label: 'MAN DOWN', sub: '🚨 CRITICAL — Fall detected, soldier is motionless', color: 'var(--accent-red)' },
+    waiting: { icon: 'bi-hourglass-split', label: 'WAITING', sub: 'Connect ESP32 to begin monitoring', color: 'var(--text-muted)' },
+};
+
+function getPostureText(pitch) {
+    const p = Math.abs(pitch);
+    if (p < 20) return 'Upright';
+    if (p < 45) return 'Leaning';
+    if (p < 70) return 'Reclined';
+    return 'Lying Down';
+}
+
+// ==================== SOCKET.IO ====================
+cacheDom();                       // cache DOM refs BEFORE socket connects
+const socket = io();
+let lastUpdateTime = 0;
+let prevStatus = 'waiting';      // track to avoid redundant hero redraws
+
+// Pending data to render on next rAF
+let pendingData = null;
+let rafScheduled = false;
+
+socket.on('connect', () => {
+    DOM.connDot && DOM.connDot.classList.add('connected');
+    DOM.connText && (DOM.connText.textContent = 'Connected');
+    socket.emit('request_history');
+});
+
+socket.on('disconnect', () => {
+    DOM.connDot && DOM.connDot.classList.remove('connected');
+    DOM.connText && (DOM.connText.textContent = 'Disconnected');
+});
+
+socket.on('sensor_update', (data) => {
+    lastUpdateTime = Date.now();
+
+    // Buffer chart data immediately (cheap — no DOM)
+    appendChartPoint(bpmChart, data.bpm || 0);
+    appendChartPoint(hrvChart, data.hrv_sdnn || 0);
+    appendChartPoint(pitchChart, data.pitch || 0);
+    appendChartPoint(motionChart, data.dynamic_accel || 0, 0);
+    appendChartPoint(motionChart, data.impact || 0, 1);
+
+    // Store latest packet; render only on next animation frame
+    pendingData = data;
+    if (!rafScheduled) {
+        rafScheduled = true;
+        requestAnimationFrame(renderFrame);
+    }
+});
+
+socket.on('alert_cleared', () => {
+    DOM.alertOverlay && DOM.alertOverlay.classList.remove('active');
+});
+
+socket.on('event_log', (events) => {
+    updateEventLog(events);
+});
+
+socket.on('history_data', (hist) => {
+    if (hist.bpm)            bpmChart.data.datasets[0].data = hist.bpm;
+    if (hist.hrv_sdnn)       hrvChart.data.datasets[0].data = hist.hrv_sdnn;
+    if (hist.dynamic_accel)  motionChart.data.datasets[0].data = hist.dynamic_accel;
+    if (hist.impact)         motionChart.data.datasets[1].data = hist.impact;
+    if (hist.pitch)          pitchChart.data.datasets[0].data = hist.pitch;
+    // One batch redraw
+    bpmChart.update('none');
+    hrvChart.update('none');
+    motionChart.update('none');
+    pitchChart.update('none');
+});
+
+// ==================== RENDER FRAME (rAF batched) ====================
+function renderFrame() {
+    rafScheduled = false;
+    const data = pendingData;
+    if (!data) return;
+
+    const status = data.status || 'waiting';
+    const cfg = STATUS_CONFIG[status] || STATUS_CONFIG.waiting;
+
+    // --- Status Hero (only repaint when status actually changes) ---
+    if (status !== prevStatus && DOM.statusHero) {
+        DOM.statusHero.className = 'status-hero ' + status;
+        DOM.statusIcon.className = 'status-icon ' + status;
+        DOM.statusIcon.innerHTML = `<i class="bi ${cfg.icon}"></i>`;
+        DOM.statusLabel.textContent = cfg.label;
+        DOM.statusLabel.style.color = cfg.color;
+        DOM.statusSub.textContent = cfg.sub;
+        prevStatus = status;  // update AFTER successful DOM write
+    }
+
+    // --- Confidence Bars ---
+    const conf = data.confidence || {};
+    setConfBar('confNormal', 'confNormalVal', conf.normal || 0, 'var(--accent-green)');
+    setConfBar('confExertion', 'confExertionVal', conf.high_exertion || 0, 'var(--accent-yellow)');
+    setConfBar('confManDown', 'confManDownVal', conf.man_down || 0, 'var(--accent-red)');
+
+    // --- Metric Cards ---
+    const bpm = data.bpm || 0;
+    const accel = data.dynamic_accel || 0;
+    const pitch = data.pitch || 0;
+
+    DOM.bpmValue.innerHTML = `${bpm.toFixed(0)}<span class="unit">BPM</span>`;
+    DOM.hrvSdnn.textContent = (data.hrv_sdnn || 0).toFixed(1);
+    DOM.hrvRmssd.textContent = (data.hrv_rmssd || 0).toFixed(1);
+
+    DOM.accelValue.innerHTML = `${accel.toFixed(3)}<span class="unit">g</span>`;
+    DOM.impactValue.textContent = (data.impact || 0).toFixed(3);
+    DOM.moveVarValue.textContent = (data.movement_var || 0).toFixed(5);
+
+    DOM.pitchValue.innerHTML = `${pitch.toFixed(1)}<span class="unit">°</span>`;
+    DOM.rollValue.textContent = (data.roll || 0).toFixed(1);
+    DOM.postureText.textContent = getPostureText(pitch);
+
+    // BPM colour
+    if (data.ecg_lead_off) {
+        DOM.bpmValue.innerHTML = `<span style="font-size:16px;color:var(--accent-yellow);">ECG LEAD OFF</span>`;
+    } else if (bpm > 150) DOM.bpmValue.style.color = 'var(--accent-red)';
+    else if (bpm > 120) DOM.bpmValue.style.color = 'var(--accent-orange)';
+    else DOM.bpmValue.style.color = 'var(--accent-green)';
+
+    // GPS text
+    DOM.gpsSpeedValue.innerHTML = `${(data.gps_speed || 0).toFixed(1)}<span class="unit">km/h</span>`;
+    DOM.gpsAltValue.textContent = (data.gps_alt || 0).toFixed(0);
+    DOM.gpsSatValue.textContent = data.gps_satellites || 0;
+    DOM.gpsFixText.textContent = data.gps_fix ? 'Fix OK' : 'No Fix';
+    DOM.gpsFixText.style.color = data.gps_fix ? 'var(--accent-green)' : 'var(--accent-red)';
+    DOM.gpsLatDisplay.textContent = (data.gps_lat || 0).toFixed(6);
+    DOM.gpsLonDisplay.textContent = (data.gps_lon || 0).toFixed(6);
+    DOM.gpsSpeedDisplay.textContent = (data.gps_speed || 0).toFixed(1);
+    updateMap(data.gps_lat, data.gps_lon);
+
+    // Stats
+    DOM.sampleCount.textContent = data.samples_received || 0;
+    if (data.uptime) {
+        const mins = Math.floor(data.uptime / 60);
+        const secs = Math.floor(data.uptime % 60);
+        DOM.uptimeDisplay.textContent = mins > 0 ? `${mins}m ${secs}s` : `${secs}s`;
+    }
+
+    // --- Charts (single batch redraw) ---
+    bpmChart.update('none');
+    hrvChart.update('none');
+    pitchChart.update('none');
+    motionChart.update('none');
+
+    // --- Alerts ---
+    if (data.alert && data.alert.action === 'trigger_alert') {
+        triggerAlert(data.alert);
+    } else if (data.alert && data.alert.action === 'clear_alert') {
+        DOM.alertOverlay.classList.remove('active');
+    }
+}
+
+function setConfBar(barId, valId, value, color) {
+    const bar = DOM[barId];
+    const val = DOM[valId];
+    bar.style.height = value + '%';
+    bar.style.background = color;
+    val.textContent = value.toFixed(0) + '%';
+    val.style.color = value > 50 ? color : 'var(--text-muted)';
+}
+
+function triggerAlert(alert) {
+    // Full-screen alert disabled — status is still shown in the dashboard header
+    // DOM.alertOverlay.classList.add('active');
+    // DOM.alertText.textContent = '🚨 MAN DOWN';
+    // DOM.alertSub.textContent = `${alert.priority} — Confidence: ${alert.confidence}%`;
+    // playAlertSound(alert.type);
+}
+
+function dismissAlert() {
+    DOM.alertOverlay.classList.remove('active');
+    socket.emit('clear_alert');
+}
+
+function updateEventLog(events) {
+    // Build all HTML as a string, then assign once (1 reflow instead of N)
+    let html = '';
+    events.forEach(evt => {
+        html += `<div class="event-item">
+            <span class="event-time">${evt.time}</span>
+            <div>
+                <div class="event-title">${evt.title}</div>
+                <div class="event-desc">${evt.description}</div>
+            </div>
+        </div>`;
+    });
+    DOM.eventList.innerHTML = html;
+}
+
+// ==================== CONNECTION WATCHDOG ====================
+setInterval(() => {
+    const elapsed = (Date.now() - lastUpdateTime) / 1000;
+    if (lastUpdateTime > 0 && elapsed > 5) {
+        DOM.connDot.classList.remove('connected');
+        DOM.connText.textContent = `No data (${elapsed.toFixed(0)}s)`;
+    }
+}, 2000);
+
+// Fetch events periodically (5 s is enough — events are rare)
+setInterval(() => {
+    fetch('/api/events')
+        .then(r => r.json())
+        .then(events => updateEventLog(events))
+        .catch(() => {});
+}, 5000);
+
+// ==================== INIT ====================
+window.addEventListener('load', () => {
+    cacheDom();
+    initMap();
+
+    fetch('/api/model')
+        .then(r => r.json())
+        .then(meta => {
+            DOM.modelName.textContent = meta.best_model || 'Unknown';
+            DOM.modelAccuracy.textContent =
+                meta.accuracy ? (meta.accuracy * 100).toFixed(1) + '%' : '—';
+            DOM.modelFeatures.textContent = meta.n_features || '—';
+        })
+        .catch(() => {});
+});
+</script>
+
+</body>
+</html>
